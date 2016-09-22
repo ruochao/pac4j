@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.Map;
  * for the {@link AuthenticatorProfileCreator}.
  *
  * @author Jerome Leleu
+ * @author Ruochao Zheng
  * @since 1.8.0
  */
 public class JwtAuthenticator implements Authenticator<TokenCredentials> {
@@ -187,8 +189,16 @@ public class JwtAuthenticator implements Authenticator<TokenCredentials> {
                 }
             }
 
+			// Check token expiration date
+			Object value = jwt.getJWTClaimsSet().getDateClaim(JwtClaims.EXPIRATION_TIME);
+	        if (value != null && value instanceof Date) {
+	            Date exp = (Date) value;	            
+	            if (exp.getTime() < System.currentTimeMillis()) {
+	                throw new CredentialsException("Token expired: exp=" + exp.toString());
+	            }
+	        }
 
-          	createJwtProfile(credentials, jwt);
+	        createJwtProfile(credentials, jwt);
 
         } catch (final ParseException e) {
             throw new TechnicalException("Cannot decrypt / verify JWT", e);

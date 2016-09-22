@@ -2,6 +2,7 @@ package org.pac4j.jwt;
 
 import com.nimbusds.jose.EncryptionMethod;
 import org.junit.Test;
+import org.pac4j.core.exception.CredentialsException;
 import org.pac4j.core.exception.HttpAction;
 import org.pac4j.core.exception.TechnicalException;
 
@@ -33,6 +34,7 @@ import static org.junit.Assert.*;
  * This class tests the {@link JwtGenerator} and {@link org.pac4j.jwt.credentials.authenticator.JwtAuthenticator}.
  *
  * @author Jerome Leleu
+ * @author Ruochao Zheng
  * @since 1.8.0
  */
 public final class JwtTests implements TestsConstants {
@@ -103,16 +105,16 @@ public final class JwtTests implements TestsConstants {
         final JwtGenerator<JwtProfile> generator = new JwtGenerator<>(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));
         final Map<String, Object> claims = new HashMap<>();
         claims.put(JwtClaims.SUBJECT, VALUE);
-        final Date now = new Date();
-        claims.put(JwtClaims.EXPIRATION_TIME, now);
+        final Date future = new Date(System.currentTimeMillis() + 1000);
+        claims.put(JwtClaims.EXPIRATION_TIME, future);
         final String token = generator.generate(claims);
         final JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));
         final JwtProfile profile = (JwtProfile) jwtAuthenticator.validateToken(token);
         assertEquals(VALUE, profile.getSubject());
-        assertEquals(now.getTime() / 1000, profile.getExpirationDate().getTime() / 1000);
+        assertEquals(future.getTime() / 1000, profile.getExpirationDate().getTime() / 1000);
         final Map<String, Object> claims2 = jwtAuthenticator.validateTokenAndGetClaims(token);
         assertEquals(VALUE, claims2.get(JwtClaims.SUBJECT));
-        assertEquals(now.getTime() / 1000, ((Date) claims2.get(JwtClaims.EXPIRATION_TIME)).getTime() / 1000);
+        assertEquals(future.getTime() / 1000, ((Date) claims2.get(JwtClaims.EXPIRATION_TIME)).getTime() / 1000);
     }
 
     @Test
@@ -280,4 +282,38 @@ public final class JwtTests implements TestsConstants {
         final KeyPair keyPair = keyGen.generateKeyPair();
         return new ECSignatureConfiguration(keyPair, JWSAlgorithm.ES256);
     }
+    
+    @Test
+    public void testJwtValidationExpired() {
+        final JwtGenerator<JwtProfile> generator = new JwtGenerator<>(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));
+        final Map<String, Object> claims = new HashMap<>();        
+        final Date past = new Date(System.currentTimeMillis() - 1);
+        claims.put(JwtClaims.SUBJECT, VALUE);
+        claims.put(JwtClaims.EXPIRATION_TIME, past);
+        final String token = generator.generate(claims);
+        final JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));       
+        try {
+            jwtAuthenticator.validateToken(token);
+            fail();
+        } catch(CredentialsException e) {       
+            assertTrue(e.getMessage().startsWith("Token expired: exp="));
+        }       
+    }
+    
+    @Test
+    public void testJwtValidationNotExpired() {
+        final JwtGenerator<JwtProfile> generator = new JwtGenerator<>(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));
+        final Map<String, Object> claims = new HashMap<>();        
+        final Date future = new Date(System.currentTimeMillis() + 10000);
+        claims.put(JwtClaims.SUBJECT, VALUE);
+        claims.put(JwtClaims.EXPIRATION_TIME, future);
+        final String token = generator.generate(claims);
+        final JwtAuthenticator jwtAuthenticator = new JwtAuthenticator(new SecretSignatureConfiguration(MAC_SECRET), new SecretEncryptionConfiguration(MAC_SECRET));       
+        try {
+            jwtAuthenticator.validateToken(token);       
+        } catch(CredentialsException e) {       
+            fail();
+        }       
+    }
+    
 }
