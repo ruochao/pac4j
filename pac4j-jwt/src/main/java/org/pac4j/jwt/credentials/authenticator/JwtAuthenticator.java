@@ -190,14 +190,14 @@ public class JwtAuthenticator implements Authenticator<TokenCredentials> {
             }
 
 			// Check token expiration date
-			Object value = jwt.getJWTClaimsSet().getDateClaim(JwtClaims.EXPIRATION_TIME);
-	        if (value != null && value instanceof Date) {
-	            Date exp = (Date) value;	            
-	            if (exp.getTime() < System.currentTimeMillis()) {
-	                throw new CredentialsException("Token expired: exp=" + exp.toString());
-	            }
-	        }
-
+            Object value = jwt.getJWTClaimsSet().getDateClaim(JwtClaims.EXPIRATION_TIME);
+            if (value != null && value instanceof Date) {
+                Date exp = (Date) value;
+                if (exp.getTime() < System.currentTimeMillis()) {
+                    throw new CredentialsException("Token expired: exp=" + exp.toString());
+                }
+            }
+	        
 	        createJwtProfile(credentials, jwt);
 
         } catch (final ParseException e) {
